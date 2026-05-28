@@ -17,4 +17,7 @@ urlpatterns = [
     # Agencies
     path('api/agencies/', include('agencies.urls')),
 
+    # Properties
+    path('api/properties/', include('properties.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
