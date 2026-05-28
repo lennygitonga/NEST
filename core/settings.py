@@ -51,6 +51,7 @@ INSTALLED_APPS = [
 
     # NEST apps
     'authentication',
+    'agencies',
     'properties',
     'tickets',
     'payments',
