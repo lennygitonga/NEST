@@ -23,4 +23,10 @@ urlpatterns = [
     # Tickets
     path('api/tickets/', include('tickets.urls')),
 
+    # Payments
+    path('api/payments/', include('payments.urls')),
+
+    # Notifications
+    path('api/notifications/', include('notifications.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
