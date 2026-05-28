@@ -20,4 +20,7 @@ urlpatterns = [
     # Properties
     path('api/properties/', include('properties.urls')),
 
+    # Tickets
+    path('api/tickets/', include('tickets.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
