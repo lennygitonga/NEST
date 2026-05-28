@@ -40,14 +40,17 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Third party
-    'rest_framework',
-    'rest_framework_simplejwt',
-    'corsheaders',
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    'allauth.socialaccount.providers.google',
+   # Third party
+'rest_framework',
+'rest_framework.authtoken',
+'rest_framework_simplejwt',
+'corsheaders',
+'allauth',
+'allauth.account',
+'allauth.socialaccount',
+'allauth.socialaccount.providers.google',
+'dj_rest_auth',
+'dj_rest_auth.registration',
 
     # NEST apps
     'authentication',

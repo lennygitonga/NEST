@@ -5,5 +5,13 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Authentication
     path('api/auth/', include('authentication.urls')),
-]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+    # Google OAuth
+    path('api/auth/social/', include('dj_rest_auth.urls')),
+    path('api/auth/social/registration/', include('dj_rest_auth.registration.urls')),
+    path('api/auth/social/google/', include('allauth.socialaccount.urls')),
+
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
