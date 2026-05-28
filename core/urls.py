@@ -14,4 +14,7 @@ urlpatterns = [
     path('api/auth/social/registration/', include('dj_rest_auth.registration.urls')),
     path('api/auth/social/google/', include('allauth.socialaccount.urls')),
 
+    # Agencies
+    path('api/agencies/', include('agencies.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
