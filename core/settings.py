@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-   # Third party
+# Third party
 'rest_framework',
 'rest_framework.authtoken',
 'rest_framework_simplejwt',
@@ -51,6 +51,7 @@ INSTALLED_APPS = [
 'allauth.socialaccount.providers.google',
 'dj_rest_auth',
 'dj_rest_auth.registration',
+'drf_spectacular',
 
     # NEST apps
     'authentication',
@@ -140,7 +141,6 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -148,6 +148,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT
@@ -201,4 +202,12 @@ REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'nest-auth',
     'JWT_AUTH_REFRESH_COOKIE': 'nest-refresh-token',
+}
+
+# Swagger / API Docs
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'NEST API',
+    'DESCRIPTION': 'Real Estate Property Management Platform — API Documentation',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
