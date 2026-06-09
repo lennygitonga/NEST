@@ -5,6 +5,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.conf import settings
+from drf_spectacular.utils import extend_schema
 import pyotp
 from django.utils.crypto import get_random_string
 from rest_framework import status, generics
@@ -41,6 +42,7 @@ def register_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(request=LoginSerializer, responses={200: UserSerializer})
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):

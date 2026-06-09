@@ -1,4 +1,5 @@
 asgiref==3.11.1
+attrs==26.1.0
 certifi==2026.5.20
 cffi==2.0.0
 charset-normalizer==3.4.7
@@ -9,12 +10,20 @@ django-allauth==65.17.0
 django-cors-headers==4.9.0
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
+drf-spectacular==0.29.0
 idna==3.16
+inflection==0.5.1
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
 pillow==12.2.0
 pycparser==3.0
 PyJWT==2.13.0
 pyotp==2.9.0
 python-dotenv==1.2.2
+PyYAML==6.0.3
+referencing==0.37.0
 requests==2.34.2
+rpds-py==2026.5.1
 sqlparse==0.5.5
+uritemplate==4.2.0
 urllib3==2.7.0
