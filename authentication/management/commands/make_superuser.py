@@ -3,14 +3,24 @@ from django.contrib.auth.models import User
 
 
 class Command(BaseCommand):
-    help = 'Makes an existing user a superuser'
+    help = 'Creates or promotes a superuser'
 
     def handle(self, *args, **kwargs):
-        try:
-            u = User.objects.get(email='admin@nest.com')
+        email = 'admin@nest.com'
+        password = 'NestAdmin2024'
+        username = 'admin'
+
+        if User.objects.filter(email=email).exists():
+            u = User.objects.get(email=email)
             u.is_staff = True
             u.is_superuser = True
+            u.set_password(password)
             u.save()
-            self.stdout.write('Successfully made admin@nest.com a superuser')
-        except User.DoesNotExist:
-            self.stdout.write('User not found')
+            self.stdout.write(f'Promoted {email} to superuser')
+        else:
+            User.objects.create_superuser(
+                username=username,
+                email=email,
+                password=password
+            )
+            self.stdout.write(f'Created superuser {email}')
