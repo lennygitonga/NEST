@@ -39,12 +39,13 @@ INSTALLED_APPS = [
     'drf_spectacular',
 
     # NEST apps
-    'authentication',
-    'agencies',
-    'properties',
-    'tickets',
-    'payments',
-    'notifications',
+'authentication',
+'agencies',
+'properties',
+'tickets',
+'payments',
+'notifications',
+'terms',
 ]
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
