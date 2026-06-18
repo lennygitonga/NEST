@@ -6,7 +6,7 @@ from .models import UserProfile
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['role', 'phone_number', 'profile_photo', 'id_document', 'is_2fa_enabled']
+        fields = ['role', 'phone_number', 'profile_photo', 'id_document', 'is_2fa_enabled', 'is_email_verified']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -32,6 +32,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         user.profile.role = role
+        user.profile.is_email_verified = False 
         user.profile.save()
         return user
 

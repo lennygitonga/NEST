@@ -9,6 +9,10 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/', views.profile_view, name='profile'),
 
+    # Email Verification
+    path('verify-email/', views.verify_email_view, name='verify_email'),
+    path('resend-verification/', views.resend_verification_view, name='resend_verification'),
+
     # Password Reset
     path('password-reset/', views.password_reset_request_view, name='password_reset_request'),
     path('password-reset-confirm/', views.password_reset_confirm_view, name='password_reset_confirm'),

@@ -1,3 +1,5 @@
+import random
+from django.utils import timezone
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -33,9 +35,10 @@ def register_view(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        send_verification_email(user)
         tokens = get_tokens_for_user(user)
         return Response({
-            'message': 'Registration successful.',
+            'message': 'Registration successful. Please check your email for a verification code.',
             'user': UserSerializer(user).data,
             'tokens': tokens
         }, status=status.HTTP_201_CREATED)
@@ -52,6 +55,11 @@ def login_view(request):
         password = serializer.validated_data['password']
         user = authenticate(request, username=email, password=password)
         if user:
+            if not user.profile.is_email_verified:
+                return Response({
+                    'error': 'Please verify your email before logging in.',
+                    'status': 'email_not_verified'
+                }, status=status.HTTP_403_FORBIDDEN)
             if user.profile.is_2fa_enabled:
                 return Response({
                     'message': '2FA required.',
@@ -206,3 +214,78 @@ def disable_2fa_view(request):
         profile.save()
         return Response({'message': '2FA disabled successfully.'})
     return Response({'error': 'Invalid code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+def generate_verification_code():
+    return str(random.randint(100000, 999999))
+
+
+def send_verification_email(user):
+    code = generate_verification_code()
+    profile = user.profile
+    profile.email_verification_code = code
+    profile.email_verification_sent_at = timezone.now()
+    profile.save()
+
+    send_mail(
+        subject='NEST — Verify Your Email',
+        message=f'Your verification code is: {code}\n\nThis code expires in 15 minutes.',
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_email_view(request):
+    email = request.data.get('email')
+    code = request.data.get('code')
+
+    if not email or not code:
+        return Response({'error': 'Email and code are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    profile = user.profile
+
+    if profile.is_email_verified:
+        return Response({'message': 'Email is already verified.'})
+
+    if not profile.email_verification_code:
+        return Response({'error': 'No verification code found. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if code expired (15 minutes)
+    if timezone.now() > profile.email_verification_sent_at + timezone.timedelta(minutes=15):
+        return Response({'error': 'Verification code has expired. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if profile.email_verification_code != code:
+        return Response({'error': 'Invalid verification code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    profile.is_email_verified = True
+    profile.email_verification_code = None
+    profile.save()
+
+    return Response({'message': 'Email verified successfully.'})
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def resend_verification_view(request):
+    email = request.data.get('email')
+
+    if not email:
+        return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if user.profile.is_email_verified:
+        return Response({'message': 'Email is already verified.'})
+
+    send_verification_email(user)
+    return Response({'message': 'Verification code sent successfully.'})
