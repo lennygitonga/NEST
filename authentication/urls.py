@@ -12,6 +12,11 @@ urlpatterns = [
     path('change-password/', views.change_password_view, name='change_password'),
     path('change-email/', views.change_email_view, name='change_email'),
 
+    # Account Deletion
+    path('account/delete-request/', views.request_account_deletion_view, name='delete_request'),
+    path('account/delete-cancel/', views.cancel_account_deletion_view, name='delete_cancel'),
+    path('account/deletion-status/', views.deletion_status_view, name='deletion_status'),
+
     # Email Verification
     path('verify-email/', views.verify_email_view, name='verify_email'),
     path('resend-verification/', views.resend_verification_view, name='resend_verification'),

@@ -70,11 +70,16 @@ def login_view(request):
                     'uid': urlsafe_base64_encode(force_bytes(user.pk))
                 }, status=status.HTTP_200_OK)
             tokens = get_tokens_for_user(user)
-            return Response({
+            response_data = {
                 'message': 'Login successful.',
                 'user': UserSerializer(user).data,
                 'tokens': tokens
-            }, status=status.HTTP_200_OK)
+            }
+            if user.profile.is_pending_deletion:
+                deletion_date = user.profile.deletion_requested_at + timedelta(days=7)
+                response_data['warning'] = 'Your account is scheduled for deletion.'
+                response_data['deletion_date'] = deletion_date
+            return Response(response_data, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid email or password.'}, status=status.HTTP_401_UNAUTHORIZED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -367,6 +372,18 @@ def request_account_deletion_view(request):
         if profile.is_pending_deletion:
             return Response({'error': 'Account deletion is already pending.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Agency specific check — block deletion if active leases exist
+        if profile.is_agency() and hasattr(user, 'agency'):
+            from properties.models import Lease
+            active_leases = Lease.objects.filter(agency=user.agency, is_active=True).count()
+            if active_leases > 0:
+                return Response({
+                    'error': f'Cannot delete account. You have {active_leases} active lease(s). Please transfer or end them first.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Unpublish all properties during grace period
+            user.agency.properties.update(is_published=False)
+
         profile.is_pending_deletion = True
         profile.deletion_requested_at = timezone.now()
         profile.save()
@@ -401,6 +418,11 @@ def cancel_account_deletion_view(request):
     profile.is_pending_deletion = False
     profile.deletion_requested_at = None
     profile.save()
+
+    # Restore agency properties if applicable
+    user = request.user
+    if profile.is_agency() and hasattr(user, 'agency'):
+        user.agency.properties.update(is_published=True)
 
     return Response({'message': 'Account deletion cancelled. Welcome back!'})
 
