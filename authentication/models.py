@@ -19,6 +19,9 @@ class UserProfile(models.Model):
     id_document = models.FileField(upload_to='id_documents/', blank=True, null=True)
     is_2fa_enabled = models.BooleanField(default=False)
     totp_secret = models.CharField(max_length=32, blank=True, null=True)
+    is_email_verified = models.BooleanField(default=False)
+    email_verification_code = models.CharField(max_length=6, blank=True, null=True)
+    email_verification_sent_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
