@@ -1,5 +1,7 @@
 import random
 from django.utils import timezone
+from datetime import timedelta
+from .serializers import AccountDeletionRequestSerializer
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -349,3 +351,74 @@ def change_email_view(request):
 
         return Response({'message': 'Email updated. Please verify your new email address.'})
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def request_account_deletion_view(request):
+    serializer = AccountDeletionRequestSerializer(data=request.data)
+    if serializer.is_valid():
+        user = request.user
+        password = serializer.validated_data['password']
+
+        if not user.check_password(password):
+            return Response({'error': 'Incorrect password.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile = user.profile
+        if profile.is_pending_deletion:
+            return Response({'error': 'Account deletion is already pending.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        profile.is_pending_deletion = True
+        profile.deletion_requested_at = timezone.now()
+        profile.save()
+
+        send_mail(
+            subject='NEST — Account Deletion Requested',
+            message=(
+                'You have requested to delete your NEST account.\n\n'
+                'Your account will be permanently deleted in 7 days.\n\n'
+                'If you change your mind, simply log in before then and cancel the deletion.'
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
+        return Response({
+            'message': 'Account deletion requested. Your account will be permanently deleted in 7 days unless you cancel.',
+            'deletion_date': profile.deletion_requested_at + timedelta(days=7)
+        })
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cancel_account_deletion_view(request):
+    profile = request.user.profile
+
+    if not profile.is_pending_deletion:
+        return Response({'error': 'No pending deletion to cancel.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    profile.is_pending_deletion = False
+    profile.deletion_requested_at = None
+    profile.save()
+
+    return Response({'message': 'Account deletion cancelled. Welcome back!'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def deletion_status_view(request):
+    profile = request.user.profile
+
+    if not profile.is_pending_deletion:
+        return Response({'is_pending_deletion': False})
+
+    deletion_date = profile.deletion_requested_at + timedelta(days=7)
+    days_remaining = (deletion_date - timezone.now()).days
+
+    return Response({
+        'is_pending_deletion': True,
+        'deletion_requested_at': profile.deletion_requested_at,
+        'deletion_date': deletion_date,
+        'days_remaining': max(days_remaining, 0)
+    })
