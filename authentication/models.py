@@ -22,6 +22,8 @@ class UserProfile(models.Model):
     is_email_verified = models.BooleanField(default=False)
     email_verification_code = models.CharField(max_length=6, blank=True, null=True)
     email_verification_sent_at = models.DateTimeField(blank=True, null=True)
+    deletion_requested_at = models.DateTimeField(blank=True, null=True)
+    is_pending_deletion = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
