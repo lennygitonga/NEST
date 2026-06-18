@@ -35,4 +35,7 @@ urlpatterns = [
     # Notifications
     path('api/notifications/', include('notifications.urls')),
 
+    # Terms & Conditions
+    path('api/terms/', include('terms.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

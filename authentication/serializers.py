@@ -12,18 +12,25 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     role = serializers.ChoiceField(choices=['AGENCY', 'LANDLORD', 'TENANT'])
+    accept_terms = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'password', 'role']
+        fields = ['email', 'first_name', 'last_name', 'password', 'role', 'accept_terms']
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return value
 
+    def validate_accept_terms(self, value):
+        if not value:
+            raise serializers.ValidationError("You must accept the Terms and Conditions to register.")
+        return value
+
     def create(self, validated_data):
         role = validated_data.pop('role')
+        validated_data.pop('accept_terms')
         user = User.objects.create_user(
             username=validated_data['email'],
             email=validated_data['email'],
@@ -32,7 +39,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         user.profile.role = role
-        user.profile.is_email_verified = False 
         user.profile.save()
         return user
 

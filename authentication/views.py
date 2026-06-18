@@ -16,6 +16,8 @@ from .serializers import (
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
     ProfileUpdateSerializer, ChangePasswordSerializer, ChangeEmailSerializer
 )
+from terms.models import TermsAndConditions
+from terms.models import UserTermsAcceptance
 from django.utils.crypto import get_random_string
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
@@ -38,6 +40,12 @@ def register_view(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+
+        # Record terms acceptance
+        current_terms = TermsAndConditions.objects.filter(is_active=True).first()
+        if current_terms:
+            UserTermsAcceptance.objects.create(user=user, terms=current_terms)
+
         send_verification_email(user)
         tokens = get_tokens_for_user(user)
         return Response({
