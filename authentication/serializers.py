@@ -58,3 +58,30 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     token = serializers.CharField()
     uid = serializers.CharField()
     new_password = serializers.CharField(write_only=True, min_length=8)
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='user.first_name', required=False)
+    last_name = serializers.CharField(source='user.last_name', required=False)
+
+    class Meta:
+        model = UserProfile
+        fields = ['first_name', 'last_name', 'phone_number', 'profile_photo', 'id_document']
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        if 'first_name' in user_data:
+            instance.user.first_name = user_data['first_name']
+        if 'last_name' in user_data:
+            instance.user.last_name = user_data['last_name']
+        instance.user.save()
+        return super().update(instance, validated_data)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+
+class ChangeEmailSerializer(serializers.Serializer):
+    new_email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)    

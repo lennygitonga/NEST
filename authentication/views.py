@@ -9,16 +9,17 @@ from django.core.mail import send_mail
 from django.conf import settings
 from drf_spectacular.utils import extend_schema
 import pyotp
+from .serializers import (
+    RegisterSerializer, LoginSerializer, UserSerializer,
+    PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    ProfileUpdateSerializer, ChangePasswordSerializer, ChangeEmailSerializer
+)
 from django.utils.crypto import get_random_string
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import (
-    RegisterSerializer, LoginSerializer, UserSerializer,
-    PasswordResetRequestSerializer, PasswordResetConfirmSerializer
-)
 
 
 def get_tokens_for_user(user):
@@ -289,3 +290,62 @@ def resend_verification_view(request):
 
     send_verification_email(user)
     return Response({'message': 'Verification code sent successfully.'})
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def profile_update_view(request):
+    profile = request.user.profile
+    serializer = ProfileUpdateSerializer(profile, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({
+            'message': 'Profile updated successfully.',
+            'user': UserSerializer(request.user).data
+        })
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password_view(request):
+    serializer = ChangePasswordSerializer(data=request.data)
+    if serializer.is_valid():
+        user = request.user
+        old_password = serializer.validated_data['old_password']
+        new_password = serializer.validated_data['new_password']
+
+        if not user.check_password(old_password):
+            return Response({'error': 'Old password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({'message': 'Password changed successfully.'})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_email_view(request):
+    serializer = ChangeEmailSerializer(data=request.data)
+    if serializer.is_valid():
+        user = request.user
+        new_email = serializer.validated_data['new_email']
+        password = serializer.validated_data['password']
+
+        if not user.check_password(password):
+            return Response({'error': 'Password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(email=new_email).exclude(pk=user.pk).exists():
+            return Response({'error': 'This email is already in use.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.email = new_email
+        user.username = new_email
+        user.save()
+
+        user.profile.is_email_verified = False
+        user.profile.save()
+
+        send_verification_email(user)
+
+        return Response({'message': 'Email updated. Please verify your new email address.'})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
