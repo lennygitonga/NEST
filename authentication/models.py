@@ -24,6 +24,8 @@ class UserProfile(models.Model):
     email_verification_sent_at = models.DateTimeField(blank=True, null=True)
     deletion_requested_at = models.DateTimeField(blank=True, null=True)
     is_pending_deletion = models.BooleanField(default=False)
+    is_banned = models.BooleanField(default=False)
+    ban_reason = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

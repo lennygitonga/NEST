@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'dj_rest_auth.registration',
     'drf_spectacular',
 
-    # NEST apps
+   # NEST apps
 'authentication',
 'agencies',
 'properties',
@@ -46,6 +46,7 @@ INSTALLED_APPS = [
 'payments',
 'notifications',
 'terms',
+'moderation',
 ]
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
