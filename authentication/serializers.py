@@ -14,9 +14,19 @@ class RegisterSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=['AGENCY', 'LANDLORD', 'TENANT'])
     accept_terms = serializers.BooleanField(write_only=True)
 
+    # Agency specific fields — only required if role is AGENCY
+    agency_name = serializers.CharField(write_only=True, required=False)
+    registration_number = serializers.CharField(write_only=True, required=False)
+    agency_address = serializers.CharField(write_only=True, required=False)
+    agency_phone = serializers.CharField(write_only=True, required=False)
+    agency_website = serializers.URLField(write_only=True, required=False)
+
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'password', 'role', 'accept_terms']
+        fields = [
+            'email', 'first_name', 'last_name', 'password', 'role', 'accept_terms',
+            'agency_name', 'registration_number', 'agency_address', 'agency_phone', 'agency_website'
+        ]
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -28,9 +38,27 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("You must accept the Terms and Conditions to register.")
         return value
 
+    def validate(self, data):
+        if data.get('role') == 'AGENCY':
+            required_fields = ['agency_name', 'registration_number', 'agency_address', 'agency_phone']
+            missing = [f for f in required_fields if not data.get(f)]
+            if missing:
+                raise serializers.ValidationError({
+                    field: 'This field is required for agency registration.' for field in missing
+                })
+        return data
+
     def create(self, validated_data):
         role = validated_data.pop('role')
         validated_data.pop('accept_terms')
+
+        # Pop agency fields
+        agency_name = validated_data.pop('agency_name', None)
+        registration_number = validated_data.pop('registration_number', None)
+        agency_address = validated_data.pop('agency_address', None)
+        agency_phone = validated_data.pop('agency_phone', None)
+        agency_website = validated_data.pop('agency_website', None)
+
         user = User.objects.create_user(
             username=validated_data['email'],
             email=validated_data['email'],
@@ -40,6 +68,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         user.profile.role = role
         user.profile.save()
+
+        if role == 'AGENCY':
+            from agencies.models import Agency
+            Agency.objects.create(
+                user=user,
+                name=agency_name,
+                registration_number=registration_number,
+                address=agency_address,
+                phone_number=agency_phone,
+                email=user.email,
+                website=agency_website or ''
+            )
+
         return user
 
 
