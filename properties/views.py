@@ -1,4 +1,5 @@
 from rest_framework import status
+from core.ai_utils import ask_groq
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -205,3 +206,36 @@ def lease_detail_view(request, pk):
         return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
     serializer = LeaseSerializer(lease)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def lease_summary_view(request, pk):
+    if is_agency(request.user):
+        lease = get_object_or_404(Lease, pk=pk, agency=request.user.agency)
+    elif is_tenant(request.user):
+        lease = get_object_or_404(Lease, pk=pk, tenant=request.user)
+    elif is_landlord(request.user):
+        lease = get_object_or_404(Lease, pk=pk, property__landlord=request.user)
+    else:
+        return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+    prompt = (
+        f"Summarize this lease agreement in simple, friendly, plain English for a tenant who is not familiar with legal terms:\n\n"
+        f"Property: {lease.property.title}\n"
+        f"Address: {lease.property.address}, {lease.property.city}\n"
+        f"Tenant: {lease.tenant.first_name} {lease.tenant.last_name}\n"
+        f"Rent Amount: KSh {lease.rent_amount}\n"
+        f"Lease Start Date: {lease.start_date}\n"
+        f"Lease End Date: {lease.end_date}\n"
+        f"Status: {'Active' if lease.is_active else 'Inactive'}\n\n"
+        f"Write a short, warm 3-4 sentence summary explaining what this means for the tenant, when rent is due, and when the lease ends. "
+        f"Do not use legal jargon."
+    )
+
+    summary = ask_groq(prompt, system_prompt="You are a friendly property assistant who explains lease terms simply.")
+
+    return Response({
+        'lease_id': lease.id,
+        'summary': summary
+    })

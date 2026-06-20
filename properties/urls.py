@@ -18,4 +18,5 @@ urlpatterns = [
     # Leases
     path('leases/', views.lease_list_create_view, name='lease_list_create'),
     path('leases/<int:pk>/', views.lease_detail_view, name='lease_detail'),
+    path('leases/<int:pk>/summary/', views.lease_summary_view, name='lease_summary'),
 ]
