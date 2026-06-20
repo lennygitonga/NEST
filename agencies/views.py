@@ -1,5 +1,7 @@
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
+from properties.models import Lease
+from payments.models import TenantCreditScore
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -95,3 +97,36 @@ def landlord_list_view(request):
     landlords = AgencyLandlord.objects.filter(agency=agency)
     serializer = AgencyLandlordSerializer(landlords, many=True)
     return Response(serializer.data)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def agency_tenants_view(request):
+    if not is_agency(request.user):
+        return Response({'error': 'Only agencies can view their tenants.'}, status=status.HTTP_403_FORBIDDEN)
+
+    agency = get_object_or_404(Agency, user=request.user)
+    leases = Lease.objects.filter(agency=agency, is_active=True).select_related('tenant', 'property')
+
+    tenants_data = []
+    for lease in leases:
+        try:
+            credit_score = TenantCreditScore.objects.get(tenant=lease.tenant)
+            score = credit_score.score
+        except TenantCreditScore.DoesNotExist:
+            score = 100
+
+        tenants_data.append({
+            'tenant_id': lease.tenant.id,
+            'tenant_name': f"{lease.tenant.first_name} {lease.tenant.last_name}",
+            'tenant_email': lease.tenant.email,
+            'property': lease.property.title,
+            'property_id': lease.property.id,
+            'lease_start_date': lease.start_date,
+            'lease_end_date': lease.end_date,
+            'rent_amount': lease.rent_amount,
+            'credit_score': score
+        })
+
+    return Response({
+        'total_tenants': len(tenants_data),
+        'tenants': tenants_data
+    })
