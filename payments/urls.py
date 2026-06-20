@@ -9,6 +9,7 @@ urlpatterns = [
     path('my-statement/', views.my_statement_view, name='my_statement'),
     path('payouts/', views.payout_list_view, name='payout_list'),
     path('reports/monthly/', views.monthly_report_view, name='monthly_report'),
+    path('analytics/', views.payment_analytics_view, name='payment_analytics'),
     path('credit-score/<int:tenant_id>/', views.tenant_credit_score_view, name='tenant_credit_score'),
 
     # Invoices

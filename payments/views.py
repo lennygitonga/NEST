@@ -1,4 +1,5 @@
 from rest_framework import status
+from agencies.models import Agency
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -428,3 +429,101 @@ def invoice_download_view(request, pk):
     p.save()
 
     return response
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def payment_analytics_view(request):
+    user = request.user
+
+    if is_nest_admin(user):
+        payments = RentPayment.objects.filter(status='COMPLETED')
+        total_collected = payments.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        total_commission = payments.aggregate(Sum('nest_commission'))['nest_commission__sum'] or 0
+        total_agencies = Agency.objects.filter(is_verified=True).count()
+        total_properties = Property.objects.count()
+        occupied = Property.objects.filter(is_vacant=False).count()
+
+        context_text = (
+            f"Platform-wide: Total rent collected KSh {total_collected}, "
+            f"NEST commission earned KSh {total_commission}, "
+            f"{total_agencies} verified agencies, "
+            f"{total_properties} total properties with {occupied} occupied."
+        )
+
+        data = {
+            'role': 'NEST_ADMIN',
+            'total_collected': total_collected,
+            'nest_commission_earned': total_commission,
+            'total_verified_agencies': total_agencies,
+            'total_properties': total_properties,
+            'occupied_properties': occupied,
+        }
+
+    elif is_agency(user):
+        agency = user.agency
+        payments = RentPayment.objects.filter(agency=agency, status='COMPLETED')
+        total_collected = payments.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        total_earnings = payments.aggregate(Sum('agency_earnings'))['agency_earnings__sum'] or 0
+        total_properties = agency.properties.count()
+        occupied = agency.properties.filter(is_vacant=False).count()
+        vacant = agency.properties.filter(is_vacant=True).count()
+
+        context_text = (
+            f"Agency portfolio: Total rent collected KSh {total_collected}, "
+            f"agency earnings after commission KSh {total_earnings}, "
+            f"{total_properties} total properties, {occupied} occupied, {vacant} vacant."
+        )
+
+        data = {
+            'role': 'AGENCY',
+            'total_collected': total_collected,
+            'agency_earnings': total_earnings,
+            'total_properties': total_properties,
+            'occupied_properties': occupied,
+            'vacant_properties': vacant,
+        }
+
+    elif is_landlord(user):
+        payments = RentPayment.objects.filter(property__landlord=user, status='COMPLETED')
+        total_collected = payments.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        total_properties = Property.objects.filter(landlord=user).count()
+        occupied = Property.objects.filter(landlord=user, is_vacant=False).count()
+
+        context_text = (
+            f"Landlord portfolio: Total rent collected on their properties KSh {total_collected}, "
+            f"{total_properties} total properties, {occupied} occupied."
+        )
+
+        data = {
+            'role': 'LANDLORD',
+            'total_collected': total_collected,
+            'total_properties': total_properties,
+            'occupied_properties': occupied,
+        }
+
+    elif is_tenant(user):
+        payments = RentPayment.objects.filter(tenant=user, status='COMPLETED')
+        total_paid = payments.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        total_payments_count = payments.count()
+
+        context_text = (
+            f"Tenant payment history: Total paid KSh {total_paid} across {total_payments_count} payments."
+        )
+
+        data = {
+            'role': 'TENANT',
+            'total_paid': total_paid,
+            'total_payments_count': total_payments_count,
+        }
+    else:
+        return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+    prompt = (
+        f"Based on this data: {context_text}\n\n"
+        f"Write a short, friendly 2-3 sentence plain English insight summary highlighting "
+        f"the most important takeaway. Be encouraging and specific with numbers."
+    )
+    insight = ask_groq(prompt, system_prompt="You are a property management analytics assistant who explains numbers simply.")
+
+    data['ai_insight'] = insight
+    return Response(data)
