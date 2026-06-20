@@ -15,6 +15,14 @@ from .serializers import (
     RentPaymentSerializer, PayoutSerializer,
     TenantCreditScoreSerializer, MonthlyReportSerializer
 )
+from .models import RentPayment, Payout, TenantCreditScore, Invoice, InvoiceItem
+from .serializers import (
+    RentPaymentSerializer, PayoutSerializer,
+    TenantCreditScoreSerializer, MonthlyReportSerializer,
+    InvoiceSerializer, InvoiceCreateSerializer, InvoiceStatusUpdateSerializer
+)
+from django.contrib.auth.models import User
+from properties.models import Property
 
 
 def is_agency(user):
@@ -259,6 +267,162 @@ def payment_receipt_download_view(request, pk):
     p.line(2*cm, y - 0.3*cm, width - 2*cm, y - 0.3*cm)
     p.setFont("Helvetica-Oblique", 9)
     p.drawString(2*cm, y - 1*cm, "This is a system generated receipt from NEST Property Management Platform.")
+
+    p.showPage()
+    p.save()
+
+    return response
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_invoice_view(request):
+    if not is_agency(request.user):
+        return Response({'error': 'Only agencies can create invoices.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = InvoiceCreateSerializer(data=request.data)
+    if serializer.is_valid():
+        data = serializer.validated_data
+        tenant = get_object_or_404(User, pk=data['tenant'])
+        property = get_object_or_404(Property, pk=data['property'])
+
+        total_amount = sum(item['amount'] for item in data['items'])
+
+        items_summary = ", ".join([f"{item['description']}: KSh {item['amount']}" for item in data['items']])
+        prompt = (
+            f"Write a short, friendly, professional 2-sentence message for a tenant explaining their new invoice. "
+            f"Invoice title: {data['title']}. Items: {items_summary}. Total: KSh {total_amount}. "
+            f"Due date: {data['due_date']}. Keep it warm but clear."
+        )
+        ai_summary = ask_groq(prompt, system_prompt="You write short, clear invoice summary messages for tenants.")
+
+        invoice = Invoice.objects.create(
+            agency=request.user.agency,
+            tenant=tenant,
+            property=property,
+            title=data['title'],
+            total_amount=total_amount,
+            due_date=data['due_date'],
+            ai_summary=ai_summary
+        )
+
+        for item in data['items']:
+            InvoiceItem.objects.create(
+                invoice=invoice,
+                description=item['description'],
+                amount=item['amount']
+            )
+
+        send_mail(
+            subject=f"NEST — New Invoice: {invoice.title}",
+            message=f"{ai_summary}\n\nTotal Amount: KSh {total_amount}\nDue Date: {data['due_date']}\n\nLog in to NEST to view full details and pay.",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[tenant.email],
+            fail_silently=False,
+        )
+
+        return Response({
+            'message': 'Invoice created and sent to tenant successfully.',
+            'invoice': InvoiceSerializer(invoice).data
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_invoices_view(request):
+    if is_agency(request.user):
+        invoices = Invoice.objects.filter(agency=request.user.agency)
+    elif is_tenant(request.user):
+        invoices = Invoice.objects.filter(tenant=request.user)
+    else:
+        return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+    serializer = InvoiceSerializer(invoices, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def invoice_detail_view(request, pk):
+    if is_agency(request.user):
+        invoice = get_object_or_404(Invoice, pk=pk, agency=request.user.agency)
+    elif is_tenant(request.user):
+        invoice = get_object_or_404(Invoice, pk=pk, tenant=request.user)
+    else:
+        return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+    serializer = InvoiceSerializer(invoice)
+    return Response(serializer.data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def invoice_status_update_view(request, pk):
+    if not is_agency(request.user):
+        return Response({'error': 'Only agencies can update invoice status.'}, status=status.HTTP_403_FORBIDDEN)
+    invoice = get_object_or_404(Invoice, pk=pk, agency=request.user.agency)
+    serializer = InvoiceStatusUpdateSerializer(invoice, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'message': 'Invoice status updated successfully.'})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def invoice_download_view(request, pk):
+    if is_agency(request.user):
+        invoice = get_object_or_404(Invoice, pk=pk, agency=request.user.agency)
+    elif is_tenant(request.user):
+        invoice = get_object_or_404(Invoice, pk=pk, tenant=request.user)
+    else:
+        return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="NEST_Invoice_{invoice.id}.pdf"'
+
+    p = canvas.Canvas(response, pagesize=A4)
+    width, height = A4
+
+    p.setFont("Helvetica-Bold", 20)
+    p.drawString(2*cm, height - 2*cm, "NEST")
+
+    p.setFont("Helvetica", 10)
+    p.drawString(2*cm, height - 2.7*cm, "Real Estate Property Management Platform")
+
+    p.line(2*cm, height - 3*cm, width - 2*cm, height - 3*cm)
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(2*cm, height - 4*cm, f"INVOICE — {invoice.title}")
+
+    p.setFont("Helvetica", 11)
+    y = height - 5*cm
+    line_height = 0.7*cm
+
+    header_details = [
+        f"Tenant: {invoice.tenant.first_name} {invoice.tenant.last_name}",
+        f"Property: {invoice.property.title}",
+        f"Due Date: {invoice.due_date.strftime('%d %B %Y')}",
+        f"Status: {invoice.status}",
+        "",
+        "ITEMS:",
+    ]
+
+    for line in header_details:
+        p.drawString(2*cm, y, line)
+        y -= line_height
+
+    for item in invoice.items.all():
+        p.drawString(2.5*cm, y, f"{item.description}: KSh {item.amount}")
+        y -= line_height
+
+    y -= 0.3*cm
+    p.line(2*cm, y, width - 2*cm, y)
+    y -= line_height
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(2*cm, y, f"TOTAL: KSh {invoice.total_amount}")
+
+    y -= 1.2*cm
+    p.setFont("Helvetica-Oblique", 9)
+    p.drawString(2*cm, y, "This is a system generated invoice from NEST Property Management Platform.")
 
     p.showPage()
     p.save()

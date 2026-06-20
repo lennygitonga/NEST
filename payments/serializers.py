@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import RentPayment, Payout, TenantCreditScore
+from .models import RentPayment, Payout, TenantCreditScore, Invoice, InvoiceItem
 
 
 class RentPaymentSerializer(serializers.ModelSerializer):
@@ -61,3 +61,43 @@ class MonthlyReportSerializer(serializers.Serializer):
     nest_commission = serializers.DecimalField(max_digits=10, decimal_places=2)
     agency_earnings = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_payments = serializers.IntegerField()
+
+
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvoiceItem
+        fields = ['id', 'description', 'amount']
+
+
+class InvoiceItemCreateSerializer(serializers.Serializer):
+    description = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    items = InvoiceItemSerializer(many=True, read_only=True)
+    tenant_email = serializers.EmailField(source='tenant.email', read_only=True)
+    property_title = serializers.CharField(source='property.title', read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'id', 'agency', 'tenant', 'tenant_email', 'property', 'property_title',
+            'title', 'total_amount', 'status', 'due_date', 'ai_summary',
+            'items', 'created_at'
+        ]
+        read_only_fields = ['agency', 'total_amount', 'ai_summary', 'created_at']
+
+
+class InvoiceCreateSerializer(serializers.Serializer):
+    tenant = serializers.IntegerField()
+    property = serializers.IntegerField()
+    title = serializers.CharField()
+    due_date = serializers.DateField()
+    items = InvoiceItemCreateSerializer(many=True)
+
+
+class InvoiceStatusUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invoice
+        fields = ['status']

@@ -10,4 +10,11 @@ urlpatterns = [
     path('payouts/', views.payout_list_view, name='payout_list'),
     path('reports/monthly/', views.monthly_report_view, name='monthly_report'),
     path('credit-score/<int:tenant_id>/', views.tenant_credit_score_view, name='tenant_credit_score'),
+
+    # Invoices
+    path('invoices/', views.list_invoices_view, name='list_invoices'),
+    path('invoices/create/', views.create_invoice_view, name='create_invoice'),
+    path('invoices/<int:pk>/', views.invoice_detail_view, name='invoice_detail'),
+    path('invoices/<int:pk>/status/', views.invoice_status_update_view, name='invoice_status_update'),
+    path('invoices/<int:pk>/download/', views.invoice_download_view, name='invoice_download'),
 ]
