@@ -77,3 +77,35 @@ class TenantCreditScore(models.Model):
 
     def __str__(self):
         return f"{self.tenant.email} — Score: {self.score}"
+    
+class Invoice(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('PAID', 'Paid'),
+        ('OVERDUE', 'Overdue'),
+    ]
+
+    agency = models.ForeignKey(Agency, on_delete=models.CASCADE, related_name='invoices')
+    tenant = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invoices')
+    property = models.ForeignKey(Property, on_delete=models.CASCADE, related_name='invoices')
+    title = models.CharField(max_length=200)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    due_date = models.DateField()
+    ai_summary = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} — {self.tenant.email} ({self.status})"
+
+    class Meta:
+        ordering = ['-created_at']
+
+
+class InvoiceItem(models.Model):
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='items')
+    description = models.CharField(max_length=200)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.description} — KSh {self.amount}"
