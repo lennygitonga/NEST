@@ -1,4 +1,9 @@
 from rest_framework import status
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import cm
+from core.ai_utils import ask_groq
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -150,3 +155,112 @@ def tenant_credit_score_view(request, tenant_id):
     credit_score = get_object_or_404(TenantCreditScore, tenant__id=tenant_id)
     serializer = TenantCreditScoreSerializer(credit_score)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_statement_view(request):
+    if not is_tenant(request.user):
+        return Response({'error': 'Only tenants can view their payment statement.'}, status=status.HTTP_403_FORBIDDEN)
+
+    payments = RentPayment.objects.filter(tenant=request.user).order_by('-payment_date')
+
+    total_paid = payments.filter(status='COMPLETED').aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+    total_payments_count = payments.filter(status='COMPLETED').count()
+
+    return Response({
+        'tenant': request.user.email,
+        'total_paid': total_paid,
+        'total_payments_count': total_payments_count,
+        'payments': RentPaymentSerializer(payments, many=True).data
+    })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def payment_receipt_view(request, pk):
+    if is_agency(request.user):
+        payment = get_object_or_404(RentPayment, pk=pk, agency=request.user.agency)
+    elif is_tenant(request.user):
+        payment = get_object_or_404(RentPayment, pk=pk, tenant=request.user)
+    elif is_landlord(request.user):
+        payment = get_object_or_404(RentPayment, pk=pk, property__landlord=request.user)
+    else:
+        return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+    prompt = (
+        f"Write a short, warm, professional one-sentence confirmation message for a rent payment receipt. "
+        f"Tenant: {payment.tenant.first_name}. Amount: KSh {payment.total_amount}. "
+        f"Property: {payment.property.title}. Keep it under 25 words."
+    )
+    confirmation_message = ask_groq(prompt, system_prompt="You write short professional receipt confirmation messages.")
+
+    return Response({
+        'receipt_number': f"NEST-RCT-{payment.id:06d}",
+        'tenant_name': f"{payment.tenant.first_name} {payment.tenant.last_name}",
+        'property': payment.property.title,
+        'amount_paid': payment.total_amount,
+        'payment_method': payment.payment_method,
+        'transaction_id': payment.transaction_id,
+        'payment_date': payment.payment_date,
+        'payment_for_month': payment.payment_for_month,
+        'status': payment.status,
+        'confirmation_message': confirmation_message
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def payment_receipt_download_view(request, pk):
+    if is_agency(request.user):
+        payment = get_object_or_404(RentPayment, pk=pk, agency=request.user.agency)
+    elif is_tenant(request.user):
+        payment = get_object_or_404(RentPayment, pk=pk, tenant=request.user)
+    elif is_landlord(request.user):
+        payment = get_object_or_404(RentPayment, pk=pk, property__landlord=request.user)
+    else:
+        return Response({'error': 'Unauthorized.'}, status=status.HTTP_403_FORBIDDEN)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="NEST_Receipt_{payment.id}.pdf"'
+
+    p = canvas.Canvas(response, pagesize=A4)
+    width, height = A4
+
+    p.setFont("Helvetica-Bold", 20)
+    p.drawString(2*cm, height - 2*cm, "NEST")
+
+    p.setFont("Helvetica", 10)
+    p.drawString(2*cm, height - 2.7*cm, "Real Estate Property Management Platform")
+
+    p.line(2*cm, height - 3*cm, width - 2*cm, height - 3*cm)
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(2*cm, height - 4*cm, "PAYMENT RECEIPT")
+
+    p.setFont("Helvetica", 11)
+    y = height - 5*cm
+    line_height = 0.7*cm
+
+    details = [
+        f"Receipt Number: NEST-RCT-{payment.id:06d}",
+        f"Tenant Name: {payment.tenant.first_name} {payment.tenant.last_name}",
+        f"Property: {payment.property.title}",
+        f"Amount Paid: KSh {payment.total_amount}",
+        f"Payment Method: {payment.payment_method}",
+        f"Transaction ID: {payment.transaction_id or 'N/A'}",
+        f"Payment Date: {payment.payment_date.strftime('%d %B %Y, %I:%M %p')}",
+        f"Payment For Month: {payment.payment_for_month.strftime('%B %Y')}",
+        f"Status: {payment.status}",
+    ]
+
+    for line in details:
+        p.drawString(2*cm, y, line)
+        y -= line_height
+
+    p.line(2*cm, y - 0.3*cm, width - 2*cm, y - 0.3*cm)
+    p.setFont("Helvetica-Oblique", 9)
+    p.drawString(2*cm, y - 1*cm, "This is a system generated receipt from NEST Property Management Platform.")
+
+    p.showPage()
+    p.save()
+
+    return response
