@@ -13,6 +13,8 @@ class Agency(models.Model):
     website = models.URLField(blank=True, null=True)
     is_verified = models.BooleanField(default=False)
     commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)
+    is_suspended = models.BooleanField(default=False)
+    suspension_reason = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
