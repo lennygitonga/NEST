@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AdminActionLog, Warning, FraudReport
+from .models import AdminActionLog, Warning, FraudReport, BanAppeal
 
 
 class AdminActionLogSerializer(serializers.ModelSerializer):
@@ -57,3 +57,27 @@ class FraudReportReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = FraudReport
         fields = ['status', 'admin_notes']
+
+
+class BanAppealSubmitSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    message = serializers.CharField()
+
+
+class BanAppealSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    ban_reason = serializers.CharField(source='user.profile.ban_reason', read_only=True)
+
+    class Meta:
+        model = BanAppeal
+        fields = [
+            'id', 'user', 'user_email', 'ban_reason', 'message',
+            'status', 'admin_response', 'created_at', 'reviewed_at'
+        ]
+        read_only_fields = ['user', 'status', 'admin_response', 'created_at', 'reviewed_at']
+
+
+class BanAppealReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BanAppeal
+        fields = ['status', 'admin_response']

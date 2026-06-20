@@ -19,6 +19,11 @@ urlpatterns = [
     path('fraud-reports/file/', views.file_fraud_report_view, name='file_fraud_report'),
     path('fraud-reports/<int:report_id>/review/', views.review_fraud_report_view, name='review_fraud_report'),
 
+    # Ban Appeals
+    path('appeals/submit/', views.submit_ban_appeal_view, name='submit_ban_appeal'),
+    path('appeals/', views.list_ban_appeals_view, name='list_ban_appeals'),
+    path('appeals/<int:appeal_id>/review/', views.review_ban_appeal_view, name='review_ban_appeal'),
+
     # Audit log
     path('audit-log/', views.audit_log_view, name='audit_log'),
 ]

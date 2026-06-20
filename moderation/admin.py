@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import AdminActionLog, Warning, FraudReport
+from .models import BanAppeal
 
 
 @admin.register(AdminActionLog)
@@ -20,3 +21,11 @@ class FraudReportAdmin(admin.ModelAdmin):
     list_display = ['reported_agency', 'reporter', 'status', 'created_at', 'reviewed_at']
     list_filter = ['status']
     search_fields = ['reported_agency__name', 'reporter__email']
+
+
+
+@admin.register(BanAppeal)
+class BanAppealAdmin(admin.ModelAdmin):
+    list_display = ['user', 'status', 'created_at', 'reviewed_at']
+    list_filter = ['status']
+    search_fields = ['user__email']

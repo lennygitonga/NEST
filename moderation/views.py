@@ -1,16 +1,19 @@
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.conf import settings
 from django.utils import timezone
 from agencies.models import Agency
-from .models import AdminActionLog, Warning, FraudReport
+from .models import AdminActionLog, Warning, FraudReport, BanAppeal
 from .serializers import (
     AdminActionLogSerializer, BanUserSerializer, SuspendAgencySerializer,
     WarningSerializer, PenalizeAgencySerializer,
-    FraudReportSerializer, FraudReportReviewSerializer
+    FraudReportSerializer, FraudReportReviewSerializer,
+    BanAppealSubmitSerializer, BanAppealSerializer, BanAppealReviewSerializer
 )
 
 
@@ -251,3 +254,99 @@ def audit_log_view(request):
     logs = AdminActionLog.objects.all()
     serializer = AdminActionLogSerializer(logs, many=True)
     return Response(serializer.data)
+
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def submit_ban_appeal_view(request):
+    serializer = BanAppealSubmitSerializer(data=request.data)
+    if serializer.is_valid():
+        email = serializer.validated_data['email']
+        message = serializer.validated_data['message']
+
+        try:
+            target_user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'No account found with this email.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not target_user.profile.is_banned:
+            return Response({'error': 'This account is not currently banned.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        existing_pending = BanAppeal.objects.filter(user=target_user, status='PENDING').exists()
+        if existing_pending:
+            return Response({'error': 'You already have a pending appeal under review.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        appeal = BanAppeal.objects.create(user=target_user, message=message)
+
+        return Response({
+            'message': 'Your appeal has been submitted and will be reviewed by our team.',
+            'appeal': BanAppealSerializer(appeal).data
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_ban_appeals_view(request):
+    if not is_nest_admin(request.user):
+        return Response({'error': 'Only NEST admins can view ban appeals.'}, status=status.HTTP_403_FORBIDDEN)
+    appeals = BanAppeal.objects.all()
+    serializer = BanAppealSerializer(appeals, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def review_ban_appeal_view(request, appeal_id):
+    if not is_nest_admin(request.user):
+        return Response({'error': 'Only NEST admins can review ban appeals.'}, status=status.HTTP_403_FORBIDDEN)
+
+    appeal = get_object_or_404(BanAppeal, pk=appeal_id)
+    serializer = BanAppealReviewSerializer(appeal, data=request.data, partial=True)
+    if serializer.is_valid():
+        new_status = serializer.validated_data.get('status', appeal.status)
+        admin_response = serializer.validated_data.get('admin_response', '')
+        serializer.save()
+        appeal.reviewed_at = timezone.now()
+        appeal.save()
+
+        if new_status == 'APPROVED':
+            appeal.user.profile.is_banned = False
+            appeal.user.profile.ban_reason = None
+            appeal.user.profile.save()
+
+            AdminActionLog.objects.create(
+                admin=request.user,
+                action_type='UNBAN_USER',
+                target_user=appeal.user,
+                reason=f"Ban appeal approved: {appeal.message[:100]}"
+            )
+
+            send_mail(
+                subject='NEST — Your Account Ban Appeal Was Approved',
+                message=(
+                    f"Good news! Your appeal has been reviewed and approved.\n\n"
+                    f"Your account has been unbanned and you can now log in again.\n\n"
+                    f"Admin note: {admin_response or 'No additional notes.'}"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[appeal.user.email],
+                fail_silently=False,
+            )
+
+        elif new_status == 'DISMISSED':
+            send_mail(
+                subject='NEST — Your Account Ban Appeal Was Reviewed',
+                message=(
+                    f"Your appeal has been reviewed and was not approved.\n\n"
+                    f"Admin note: {admin_response or 'No additional notes.'}\n\n"
+                    f"If you believe this is a mistake, you may submit another appeal with more details."
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[appeal.user.email],
+                fail_silently=False,
+            )
+
+        return Response({'message': f'Appeal {new_status.lower()} successfully.'})
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

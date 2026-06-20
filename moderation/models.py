@@ -64,3 +64,24 @@ class FraudReport(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+
+class BanAppeal(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending Review'),
+        ('APPROVED', 'Approved — Unbanned'),
+        ('DISMISSED', 'Dismissed'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ban_appeals')
+    message = models.TextField()
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='PENDING')
+    admin_response = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Appeal by {self.user.email} — {self.status}"
+
+    class Meta:
+        ordering = ['-created_at']
