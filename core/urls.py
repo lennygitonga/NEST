@@ -38,4 +38,7 @@ urlpatterns = [
     # Terms & Conditions
     path('api/terms/', include('terms.urls')),
 
+    # Moderation
+    path('api/moderation/', include('moderation.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

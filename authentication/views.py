@@ -66,6 +66,12 @@ def login_view(request):
         password = serializer.validated_data['password']
         user = authenticate(request, username=email, password=password)
         if user:
+            if user.profile.is_banned:
+                return Response({
+                    'error': 'Your account has been banned.',
+                    'reason': user.profile.ban_reason,
+                    'status': 'banned'
+                }, status=status.HTTP_403_FORBIDDEN)
             if not user.profile.is_email_verified:
                 return Response({
                     'error': 'Please verify your email before logging in.',
