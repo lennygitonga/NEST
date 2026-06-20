@@ -1,4 +1,5 @@
 from rest_framework import status
+from core.ai_utils import ask_groq
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -45,7 +46,32 @@ def ticket_list_create_view(request):
     if request.method == 'POST':
         if not is_tenant(request.user):
             return Response({'error': 'Only tenants can file maintenance tickets.'}, status=status.HTTP_403_FORBIDDEN)
-        serializer = MaintenanceTicketSerializer(data=request.data, context={'request': request})
+
+        data = request.data.copy()
+
+        # AI auto-classify priority if not explicitly provided
+        if not data.get('priority'):
+            title = data.get('title', '')
+            description = data.get('description', '')
+            ai_prompt = (
+                f"A tenant filed this maintenance ticket:\n"
+                f"Title: {title}\n"
+                f"Description: {description}\n\n"
+                f"Classify the priority as exactly one word: LOW, MEDIUM, HIGH, or URGENT. "
+                f"URGENT means immediate safety risk (gas leak, fire, flooding, no electricity/water). "
+                f"HIGH means significant inconvenience (broken lock, major leak). "
+                f"MEDIUM means standard issues (faulty appliance, minor leak). "
+                f"LOW means cosmetic or non-urgent (paint, minor cosmetic damage). "
+                f"Respond with only the single word."
+            )
+            ai_response = ask_groq(ai_prompt, system_prompt="You are a property maintenance triage assistant. Respond with only one word.")
+            ai_priority = ai_response.strip().upper()
+            if ai_priority in ['LOW', 'MEDIUM', 'HIGH', 'URGENT']:
+                data['priority'] = ai_priority
+            else:
+                data['priority'] = 'MEDIUM'
+
+        serializer = MaintenanceTicketSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response({
