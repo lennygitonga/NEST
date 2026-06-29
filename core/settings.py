@@ -163,6 +163,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'noreply@nest.com'
 
 # Google OAuth
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': [

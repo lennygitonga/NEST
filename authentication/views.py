@@ -1,5 +1,7 @@
 import random
 from django.utils import timezone
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from datetime import timedelta
 from .serializers import AccountDeletionRequestSerializer
 from django.contrib.auth.models import User
@@ -96,6 +98,59 @@ def login_view(request):
             return Response(response_data, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid email or password.'}, status=status.HTTP_401_UNAUTHORIZED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def google_login_view(request):
+    token = request.data.get('id_token')
+    if not token:
+        return Response({'error': 'id_token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            settings.GOOGLE_CLIENT_ID
+        )
+    except ValueError:
+        return Response({'error': 'Invalid Google token.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    email = idinfo.get('email')
+    if not email:
+        return Response({'error': 'Google account has no email.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    first_name = idinfo.get('given_name', '')
+    last_name = idinfo.get('family_name', '')
+
+    user, created = User.objects.get_or_create(
+        username=email,
+        defaults={
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+        }
+    )
+
+    if created:
+        user.set_unusable_password()
+        user.save()
+        user.profile.is_email_verified = True
+        user.profile.save()
+
+    if user.profile.is_banned:
+        return Response({
+            'error': 'Your account has been banned.',
+            'reason': user.profile.ban_reason,
+            'status': 'banned'
+        }, status=status.HTTP_403_FORBIDDEN)
+
+    tokens = get_tokens_for_user(user)
+    return Response({
+        'message': 'Login successful.',
+        'user': UserSerializer(user).data,
+        'tokens': tokens
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
