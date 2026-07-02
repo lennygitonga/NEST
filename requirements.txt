@@ -17,6 +17,7 @@ django-cors-headers==4.9.0
 djangorestframework==3.17.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.29.0
+google-auth==2.55.1
 groq==1.4.0
 gunicorn==26.0.0
 h11==0.16.0
@@ -29,6 +30,8 @@ jsonschema-specifications==2025.9.1
 packaging==26.2
 pillow==12.2.0
 psycopg2-binary==2.9.12
+pyasn1==0.6.3
+pyasn1_modules==0.4.2
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
