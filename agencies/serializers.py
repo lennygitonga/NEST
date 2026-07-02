@@ -37,13 +37,19 @@ class AgencyVerifySerializer(serializers.ModelSerializer):
 
 
 class AgencyLandlordSerializer(serializers.ModelSerializer):
+    landlord_email = serializers.EmailField(source='landlord.email', read_only=True)
+    landlord_name = serializers.SerializerMethodField()
+
     class Meta:
         model = AgencyLandlord
         fields = [
-            'id', 'agency', 'landlord', 'status',
-            'management_fee_percent', 'joined_at'
+            'id', 'agency', 'landlord', 'landlord_email', 'landlord_name',
+            'status', 'management_fee_percent', 'joined_at'
         ]
         read_only_fields = ['joined_at']
+
+    def get_landlord_name(self, obj):
+        return f"{obj.landlord.first_name} {obj.landlord.last_name}".strip() or obj.landlord.email
 
 
 class AgencyDashboardSerializer(serializers.ModelSerializer):
