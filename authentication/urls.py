@@ -34,4 +34,7 @@ urlpatterns = [
 
     # Admin User List
     path('users/', views.user_list_view, name='user_list'),
+
+     # Find User by Email
+    path('find-user/', views.find_user_by_email_view, name='find_user'),
 ]

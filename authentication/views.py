@@ -523,3 +523,18 @@ def user_list_view(request):
     users = User.objects.all().select_related('profile').order_by('-date_joined')
     serializer = UserSerializer(users, many=True)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def find_user_by_email_view(request):
+    email = request.query_params.get('email')
+    if not email:
+        return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        user = User.objects.get(email=email)
+        if user.profile.role != 'LANDLORD':
+            return Response({'error': 'This user is not a Landlord.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'id': user.id, 'email': user.email, 'name': f"{user.first_name} {user.last_name}".strip()})
+    except User.DoesNotExist:
+        return Response({'error': 'No user found with that email.'}, status=status.HTTP_404_NOT_FOUND)    
