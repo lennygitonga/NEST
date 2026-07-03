@@ -513,3 +513,13 @@ def deletion_status_view(request):
         'deletion_date': deletion_date,
         'days_remaining': max(days_remaining, 0)
     })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_list_view(request):
+    if request.user.profile.role != 'NEST_ADMIN':
+        return Response({'error': 'Only NEST admins can view all users.'}, status=status.HTTP_403_FORBIDDEN)
+    users = User.objects.all().select_related('profile').order_by('-date_joined')
+    serializer = UserSerializer(users, many=True)
+    return Response(serializer.data)
