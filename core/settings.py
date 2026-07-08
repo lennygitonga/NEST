@@ -196,6 +196,7 @@ REST_AUTH = {
     'USE_JWT': True,
     'JWT_AUTH_COOKIE': 'nest-auth',
     'JWT_AUTH_REFRESH_COOKIE': 'nest-refresh-token',
+    'LOGIN_SERIALIZER': 'dj_rest_auth.serializers.LoginSerializer',
 }
 
 # Swagger
