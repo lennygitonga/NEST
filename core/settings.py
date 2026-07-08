@@ -38,16 +38,17 @@ INSTALLED_APPS = [
     'dj_rest_auth.registration',
     'drf_spectacular',
 
-   # NEST apps
-'authentication',
-'agencies',
-'properties',
-'tickets',
-'payments',
-'notifications',
-'terms',
-'moderation',
+    # NEST apps
+    'authentication',
+    'agencies',
+    'properties',
+    'tickets',
+    'payments',
+    'notifications',
+    'terms',
+    'moderation',
 ]
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -160,6 +161,7 @@ AUTHENTICATION_BACKENDS = [
 # Allauth configuration adjustments
 ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Added to bypass mandatory verification blocks for testing
 
 SITE_ID = 1
 
