@@ -153,12 +153,12 @@ CORS_ALLOWED_ORIGINS = [
 
 # Auth
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-    'allauth.account.auth_backends.AuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',             
+    'allauth.account.auth_backends.AuthenticationBackend',   
 ]
 
 # Allauth configuration adjustments
-ACCOUNT_AUTHENTICATION_METHOD = 'username_email'  # Allows logging in with either username or email
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 ACCOUNT_EMAIL_REQUIRED = True
 
 SITE_ID = 1
