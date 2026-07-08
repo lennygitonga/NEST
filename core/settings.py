@@ -145,10 +145,10 @@ SIMPLE_JWT = {
 }
 
 # CORS
-CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
-    'https://nest-frontend-fyc4.vercel.app',
-    'http://localhost:5173',
+    "http://localhost:5173",  # Vite local development
+    "https://nest-frontend-fyc4.vercel.app",  # Your main Vercel production domain
+    "https://nest-frontend-fyc4-edhsldwy3-lennygitongas-projects.vercel.app",  # This exact preview domain
 ]
 
 # Auth
